@@ -1,8 +1,10 @@
-import random
-import os
-from skimage import io
+import pandas as pd
 import matplotlib.pyplot as plt
+import random
 import matplotlib.patches as patches
+from skimage import io
+import os
+import numpy as np
 
 def display_images_by_category(annotations, category_id, num_images=5):
     # Filter annotations for the given category_id
@@ -84,6 +86,66 @@ def display_images_with_coco_annotations(image_paths, annotations, display_type=
         img_annotations = [ann for ann in annotations['annotations'] if ann['image_id'] == img_id]
         
         display_image_with_annotations(ax, image, img_annotations, display_type, colors)
+
+    plt.tight_layout()
+    plt.show()
+    
+    
+    
+def visualize_annotation_mask(annotations, image_id):
+    """
+    Visualize the annotation mask for a given image ID.
+
+    Parameters:
+        annotations (dict): COCO annotations.
+        image_id (int): ID of the image to visualize.
+    """
+    # Find the image metadata
+    image_info = next((img for img in annotations['images'] if img['id'] == image_id), None)
+
+    # Load the image
+    img_path = os.path.join('Dataset/train', image_info['file_name'])
+    image = io.imread(img_path)
+
+    # Create an empty mask
+    mask = np.zeros((image.shape[0], image.shape[1]), dtype=np.uint8)
+
+    # Add annotations to the mask
+    for ann in annotations['annotations']:
+        if ann['image_id'] == image_id:
+            for seg in ann.get('segmentation', []):
+                poly = np.array(seg).reshape(-1, 2)
+                x_min, y_min = np.min(poly, axis=0).astype(int)
+                x_max, y_max = np.max(poly, axis=0).astype(int)
+
+                for y in range(y_min, y_max + 1):
+                    for x in range(x_min, x_max + 1):
+                        # Simple point-in-polygon check
+                        n = len(poly)
+                        inside = False
+                        px, py = x, y
+                        for i in range(n):
+                            x1, y1 = poly[i]
+                            x2, y2 = poly[(i + 1) % n]
+                            if ((y1 > py) != (y2 > py)) and (px < (x2 - x1) * (py - y1) / (y2 - y1) + x1):
+                                inside = not inside
+                        if inside:
+                            mask[y, x] = 255
+
+    # Visualize the image and mask
+    plt.figure(figsize=(10, 5))
+
+    # Original image
+    plt.subplot(1, 2, 1)
+    plt.imshow(image)
+    plt.title("Original Image")
+    plt.axis('off')
+
+    # Annotation mask
+    plt.subplot(1, 2, 2)
+    plt.imshow(mask, cmap='gray')
+    plt.title("Annotation Mask")
+    plt.axis('off')
 
     plt.tight_layout()
     plt.show()
