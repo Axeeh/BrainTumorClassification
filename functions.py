@@ -92,13 +92,14 @@ def display_images_with_coco_annotations(image_paths, annotations, display_type=
     
     
     
-def visualize_annotation_mask(annotations, image_id):
+def visualize_annotation_mask(annotations, image_id, show_annotations=False):
     """
-    Visualize the annotation mask for a given image ID.
+    Visualize the annotation mask for a given image ID, with an option to display annotations.
 
     Parameters:
         annotations (dict): COCO annotations.
         image_id (int): ID of the image to visualize.
+        show_annotations (bool): Whether to display annotations on the image.
     """
     # Find the image metadata
     image_info = next((img for img in annotations['images'] if img['id'] == image_id), None)
@@ -133,19 +134,34 @@ def visualize_annotation_mask(annotations, image_id):
                             mask[y, x] = 255
 
     # Visualize the image and mask
-    plt.figure(figsize=(10, 5))
+    plt.figure(figsize=(15, 5))
 
-    # Original image
-    plt.subplot(1, 2, 1)
-    plt.imshow(image)
-    plt.title("Original Image")
-    plt.axis('off')
 
     # Annotation mask
-    plt.subplot(1, 2, 2)
+    plt.subplot(1, 3 if show_annotations else 2, 2)
     plt.imshow(mask, cmap='gray')
     plt.title("Annotation Mask")
     plt.axis('off')
 
+    # Optional: Display annotations
+    if show_annotations:
+        plt.subplot(1, 3, 3)
+        plt.imshow(image)
+        plt.title("Image with Annotations")
+        plt.axis('off')
+
+        for ann in annotations['annotations']:
+            if ann['image_id'] == image_id:
+                for seg in ann.get('segmentation', []):
+                    poly = np.array(seg).reshape(-1, 2)
+                    polygon = patches.Polygon(poly, closed=True, edgecolor='r', fill=False, linewidth=2)
+                    plt.gca().add_patch(polygon)
+    else:
+        plt.subplot(1, 2, 1)
+        plt.imshow(image)
+        plt.title("Original Image")
+        plt.axis('off')
+
+    # Adjust layout for better visualization
     plt.tight_layout()
     plt.show()
