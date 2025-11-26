@@ -236,14 +236,13 @@ def sample_annotation_mask_pixels(mask, num_true=3, num_false=3, random_state=No
 
 
 # FOR PATCHES
-def pick_random_centers(mask, size=100, ignore=32):
+def pick_random_centers(mask, size=100, ignore=0):
     mask_ignored = mask.copy()
     mask_ignored[:ignore,:]=False
     mask_ignored[-ignore:,:]=False
     mask_ignored[:,:ignore]=False
     mask_ignored[:,-ignore:]=False
-
-    rs, cs = np.where(mask)
+    rs, cs = np.where(mask_ignored)
     ix = np.random.randint(len(rs), size=size)
     return rs[ix], cs[ix]
 
