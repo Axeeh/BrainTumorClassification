@@ -232,3 +232,45 @@ def sample_annotation_mask_pixels(mask, num_true=3, num_false=3, random_state=No
     false_samples = false_positions[rng.choice(len(false_positions), size=num_false, replace=False)]
 
     return {"true": [tuple(p) for p in true_samples], "false": [tuple(p) for p in false_samples]}
+
+
+
+# FOR PATCHES
+def pick_random_centers(mask, size=100, ignore=32):
+    mask_ignored = mask.copy()
+    mask_ignored[:ignore,:]=False
+    mask_ignored[-ignore:,:]=False
+    mask_ignored[:,:ignore]=False
+    mask_ignored[:,-ignore:]=False
+
+    rs, cs = np.where(mask)
+    ix = np.random.randint(len(rs), size=size)
+    return rs[ix], cs[ix]
+
+
+def extract_patches(annotations, image_id):
+
+    image_info = next((img for img in annotations['images'] if img['id'] == image_id), None)
+    img_path = os.path.join('Dataset/train', image_info['file_name'])
+    im = io.imread(img_path)
+    
+    mask = create_mask(annotations, image_id)    
+
+    patches = []
+    labels = []
+
+    # check di charles
+
+    rs,cs = pick_random_centers(mask, size=1000, ignore=32)
+    # plt.plot(cs, rs, 'b.')
+    for r,c in zip(rs,cs):
+        patches.append(im[r-32:r+32, c-32:c+32, :])
+        labels.append(mask[r,c])
+
+    rs,cs = pick_random_centers(~mask, size=1000, ignore=32)
+    # plt.plot(cs, rs, 'w.')
+    for r,c in zip(rs,cs):
+        patches.append(im[r-32:r+32, c-32:c+32, :])
+        labels.append(mask[r,c])
+        
+    return patches, labels
