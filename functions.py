@@ -283,25 +283,34 @@ def extract_patches(annotations, image_id):
     patches = []
     labels = []
 
-    # check di charles
-
-
     # Estrai patches tumorali (garantite al 100% dentro la regione tumor)
-    try:
-        rs, cs = pick_random_centers(mask_bool, size=1, ignore=32)
-        for r, c in zip(rs, cs):
-            patches.append(im[r-32:r+32, c-32:c+32, :])
-            labels.append(255)  # tumor label
-    except ValueError as e:
-        print(f"Warning for tumor patches: {e}")
+    tumor_success = False
+    for attempt in range(5):
+        try:
+            rs, cs = pick_random_centers(mask_bool, size=1, ignore=32)
+            for r, c in zip(rs, cs):
+                patches.append(im[r-32:r+32, c-32:c+32, :])
+                labels.append(255)  # tumor label
+            tumor_success = True
+            break
+        except ValueError as e:
+            print(f"Attempt {attempt+1}/5 for tumor patches failed: {e}")
+    if not tumor_success:
+        print("Warning: failed to extract tumor patches after 5 attempts")
 
     # Estrai patches non-tumorali (garantite al 100% fuori dalla regione tumor)
-    try:
-        rs, cs = pick_random_centers(~mask_bool, size=1, ignore=32)
-        for r, c in zip(rs, cs):
-            patches.append(im[r-32:r+32, c-32:c+32, :])
-            labels.append(0)  # non-tumor label
-    except ValueError as e:
-        print(f"Warning for non-tumor patches: {e}")
+    nontumor_success = False
+    for attempt in range(5):
+        try:
+            rs, cs = pick_random_centers(~mask_bool, size=1, ignore=32)
+            for r, c in zip(rs, cs):
+                patches.append(im[r-32:r+32, c-32:c+32, :])
+                labels.append(0)  # non-tumor label
+            nontumor_success = True
+            break
+        except ValueError as e:
+            print(f"Attempt {attempt+1}/5 for non-tumor patches failed: {e}")
+    if not nontumor_success:
+        print("Warning: failed to extract non-tumor patches after 5 attempts")
         
     return patches, labels
