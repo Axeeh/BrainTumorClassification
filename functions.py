@@ -242,9 +242,32 @@ def pick_random_centers(mask, size=100, ignore=0):
     mask_ignored[-ignore:,:]=False
     mask_ignored[:,:ignore]=False
     mask_ignored[:,-ignore:]=False
-    rs, cs = np.where(mask_ignored)
-    ix = np.random.randint(len(rs), size=size)
-    return rs[ix], cs[ix]
+    
+    h,w = mask_ignored.shape
+    valid_centers = []
+    
+    for r in range(ignore, h - ignore):
+        for c in range(ignore, w - ignore):
+            if mask_ignored[r, c]:
+                # Verifica che tutti i pixel nella patch siano True
+                patch = mask_ignored[r-ignore:r+ignore, c-ignore:c+ignore]
+                if np.all(patch):
+                    valid_centers.append((r, c))
+
+    # STEP 3: Seleziona random tra i centri validi
+    if len(valid_centers) == 0:
+        raise ValueError(f"No valid centers found with ignore={ignore}. Try reducing ignore value.")
+    
+        
+    actual_size = min(size, len(valid_centers))
+    selected_indices = np.random.choice(len(valid_centers), size=actual_size, replace=False)
+    selected_centers = [valid_centers[i] for i in selected_indices]
+    
+    
+    rs = [c[0] for c in selected_centers]
+    cs = [c[1] for c in selected_centers]
+    
+    return np.array(rs), np.array(cs)
 
 
 def extract_patches(annotations, image_id):
@@ -254,22 +277,31 @@ def extract_patches(annotations, image_id):
     im = io.imread(img_path)
     
     mask = create_mask(annotations, image_id)    
+    mask_bool = mask.astype(bool)
+
 
     patches = []
     labels = []
 
     # check di charles
 
-    rs,cs = pick_random_centers(mask, size=1000, ignore=32)
-    # plt.plot(cs, rs, 'b.')
-    for r,c in zip(rs,cs):
-        patches.append(im[r-32:r+32, c-32:c+32, :])
-        labels.append(mask[r,c])
 
-    rs,cs = pick_random_centers(~mask, size=1000, ignore=32)
-    # plt.plot(cs, rs, 'w.')
-    for r,c in zip(rs,cs):
-        patches.append(im[r-32:r+32, c-32:c+32, :])
-        labels.append(mask[r,c])
+    # Estrai patches tumorali (garantite al 100% dentro la regione tumor)
+    try:
+        rs, cs = pick_random_centers(mask_bool, size=1, ignore=32)
+        for r, c in zip(rs, cs):
+            patches.append(im[r-32:r+32, c-32:c+32, :])
+            labels.append(255)  # tumor label
+    except ValueError as e:
+        print(f"Warning for tumor patches: {e}")
+
+    # Estrai patches non-tumorali (garantite al 100% fuori dalla regione tumor)
+    try:
+        rs, cs = pick_random_centers(~mask_bool, size=1, ignore=32)
+        for r, c in zip(rs, cs):
+            patches.append(im[r-32:r+32, c-32:c+32, :])
+            labels.append(0)  # non-tumor label
+    except ValueError as e:
+        print(f"Warning for non-tumor patches: {e}")
         
     return patches, labels
