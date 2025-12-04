@@ -408,3 +408,55 @@ def generate_segmentation_dataset(coco_data, dataset_dir, target_size=64):
     y = np.array(y)[..., np.newaxis]  # Shape: (N, target_size, target_size, 1)
     
     return X, y
+
+
+def weighted_binary_crossentropy(tf, y_true, y_pred, tumor_weight, non_tumor_weight):
+    """Custom loss that weights tumor pixels more heavily"""
+    # Clip predictions to avoid log(0)
+    y_pred = tf.clip_by_value(y_pred, 1e-7, 1 - 1e-7)
+    
+    # Binary crossentropy
+    bce = -(y_true * tf.math.log(y_pred) + (1 - y_true) * tf.math.log(1 - y_pred))
+    
+    # Apply weights: tumor pixels get higher weight
+    weighted = bce * (y_true * tumor_weight + (1 - y_true) * non_tumor_weight)
+    
+    return tf.reduce_mean(weighted)
+
+
+def evaluate_segmentation(model, images, masks, threshold=0.5):
+    """Calculate segmentation metrics"""
+    predictions = model.predict(images, verbose=0)
+    pred_binary = (predictions > threshold).astype(np.uint8)
+    
+    masks_flat = masks.flatten()
+    pred_flat = pred_binary.flatten()
+    
+    # Accuracy
+    accuracy = np.sum(masks_flat == pred_flat) / len(masks_flat)
+    
+    # Dice coefficient (F1 for segmentation)
+    intersection = np.sum(masks_flat * pred_flat)
+    dice = 2 * intersection / (np.sum(masks_flat) + np.sum(pred_flat) + 1e-7)
+    
+    # IoU (Intersection over Union)
+    union = np.sum((masks_flat + pred_flat) > 0)
+    iou = intersection / union if union > 0 else 0
+    
+    # Precision and Recall
+    tp = np.sum((pred_flat == 1) & (masks_flat == 1))
+    fp = np.sum((pred_flat == 1) & (masks_flat == 0))
+    fn = np.sum((pred_flat == 0) & (masks_flat == 1))
+    
+    precision = tp / (tp + fp + 1e-7)
+    recall = tp / (tp + fn + 1e-7)
+    f1 = 2 * (precision * recall) / (precision + recall + 1e-7)
+    
+    return {
+        'accuracy': accuracy,
+        'dice': dice,
+        'iou': iou,
+        'precision': precision,
+        'recall': recall,
+        'f1': f1
+    }
