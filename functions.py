@@ -167,7 +167,7 @@ def visualize_annotation_mask(annotations, image_id, show_annotations=False):
     plt.show()    
     
     
-def create_mask(annotations, image_id):
+def create_mask(annotations, image_id, where = "train"):
     """
     return the mask of the image
 
@@ -179,7 +179,7 @@ def create_mask(annotations, image_id):
     image_info = next((img for img in annotations['images'] if img['id'] == image_id), None)
 
     # Load the image
-    img_path = os.path.join('Dataset/train', image_info['file_name'])
+    img_path = os.path.join(f'Dataset/{where}', image_info['file_name'])
     image = io.imread(img_path)
 
     # Create an empty mask
@@ -270,13 +270,13 @@ def pick_random_centers(mask, size=100, ignore=0):
     return np.array(rs), np.array(cs)
 
 
-def extract_patches(annotations, image_id):
+def extract_patches(annotations, image_id, where = "train"):
 
     image_info = next((img for img in annotations['images'] if img['id'] == image_id), None)
-    img_path = os.path.join('Dataset/train', image_info['file_name'])
+    img_path = os.path.join(f'Dataset/{where}', image_info['file_name'])
     im = io.imread(img_path)
     
-    mask = create_mask(annotations, image_id)    
+    mask = create_mask(annotations, image_id, where)    
     mask_bool = mask.astype(bool)
 
 
