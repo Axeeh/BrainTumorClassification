@@ -314,3 +314,97 @@ def extract_patches(annotations, image_id, where = "train"):
         print("Warning: failed to extract non-tumor patches after 5 attempts")
         
     return patches, labels
+
+
+# ===== NUOVE FUNZIONI PER UNET SEGMENTATION =====
+
+def get_annotations_dict(coco_data):
+    """Crea mapping: image_id -> lista di bounding boxes"""
+    annotations_by_id = {}
+    for ann in coco_data['annotations']:
+        img_id = ann['image_id']
+        if img_id not in annotations_by_id:
+            annotations_by_id[img_id] = []
+        annotations_by_id[img_id].append(ann['bbox'])
+    return annotations_by_id
+
+
+def create_mask_from_bbox(image_shape, bboxes):
+    """Crea maschera binaria dai bounding boxes COCO"""
+    mask = np.zeros(image_shape, dtype=np.float32)
+    for bbox in bboxes:
+        x, y, w, h = [int(v) for v in bbox]
+        x1, y1 = max(0, x), max(0, y)
+        x2, y2 = min(image_shape[1], x + w), min(image_shape[0], y + h)
+        mask[y1:y2, x1:x2] = 1
+    return mask
+
+
+def generate_segmentation_dataset(coco_data, dataset_dir, target_size=64):
+    """
+    Genera dataset di immagini e maschere per UNet
+    - Carica immagine
+    - La ridimensiona a target_size
+    - Riscala le coordinate della segmentazione
+    - Crea la maschera a target_size
+    
+    Returns:
+        X: array (N, target_size, target_size, 3)
+        y: array (N, target_size, target_size, 1)
+    """
+    from PIL import Image
+    from skimage import draw
+    
+    X = []
+    y = []
+    
+    for img_info in coco_data['images']:
+        img_id = img_info['id']
+        img_path = os.path.join(dataset_dir, img_info['file_name'])
+        
+        try:
+            # Carica immagine a risoluzione originale
+            image = Image.open(img_path).convert('RGB')
+            original_w, original_h = image.size
+            
+            # Ridimensiona immagine
+            image = image.resize((target_size, target_size), Image.BILINEAR)
+            image_array = np.array(image, dtype=np.float32) / 255.0
+            
+            # Crea maschera a target_size VUOTA
+            mask = np.zeros((target_size, target_size), dtype=np.float32)
+            
+            # Rasterizza le segmentazioni ridimensionate
+            for ann in coco_data['annotations']:
+                if ann['image_id'] == img_id:
+                    for seg in ann.get('segmentation', []):
+                        if isinstance(seg, list) and len(seg) >= 6:
+                            # Converti lista di coordinate in array
+                            poly = np.array(seg, dtype=np.float32).reshape(-1, 2)
+                            
+                            # Riscala coordinate alla nuova risoluzione
+                            poly[:, 0] = poly[:, 0] * (target_size / original_w)
+                            poly[:, 1] = poly[:, 1] * (target_size / original_h)
+                            
+                            # Rasterizza il poligono sulla maschera
+                            try:
+                                poly_int = poly.astype(np.int32)
+                                # draw.polygon(row_coords, col_coords, shape)
+                                rr, cc = draw.polygon(poly_int[:, 1], poly_int[:, 0], 
+                                                     shape=(target_size, target_size))
+                                mask[rr, cc] = 1.0
+                            except Exception as e:
+                                print(f"Error rasterizing polygon: {e}")
+                                continue
+            
+            X.append(image_array)
+            y.append(mask)
+            
+        except Exception as e:
+            print(f"Error processing {img_path}: {e}")
+            continue
+    
+    X = np.array(X)  # Shape: (N, target_size, target_size, 3)
+    y = np.array(y)[..., np.newaxis]  # Shape: (N, target_size, target_size, 1)
+    
+    return X, y
