@@ -460,3 +460,55 @@ def evaluate_segmentation(model, images, masks, threshold=0.5):
         'recall': recall,
         'f1': f1
     }
+
+
+def segment_full_image(classifier, image, patch_size=64, stride=32):
+    """
+    Applica il classificatore di patch su un'immagine intera usando sliding window
+    
+    Args:
+        classifier: Classificatore addestrato (logistic/cnn/fcnn)
+        image: Immagine completa normalizzata [0,1], shape (H, W, 3)
+        patch_size: Dimensione patch (64)
+        stride: Passo della sliding window
+    
+    Returns:
+        Mappa di probabilità (H, W)
+    """
+    h, w = image.shape[:2]
+    prob_map = np.zeros((h, w), dtype=np.float32)
+    count_map = np.zeros((h, w), dtype=np.float32)
+    
+    patches = []
+    positions = []
+    
+    # Estrai tutte le patch con sliding window
+    for y in range(0, h - patch_size + 1, stride):
+        for x in range(0, w - patch_size + 1, stride):
+            patch = image[y:y+patch_size, x:x+patch_size]
+            
+            if patch.shape[:2] == (patch_size, patch_size):
+                patches.append(patch)
+                positions.append((y, x))
+    
+    if len(patches) == 0:
+        return prob_map
+    
+    patches_array = np.array(patches)
+    
+    # Predici in batch per efficienza
+    if hasattr(classifier, 'predict_proba'):  # Logistic Regression
+        patches_flat = patches_array.reshape(len(patches), -1)
+        probs = classifier.predict_proba(patches_flat)[:, 1]
+    else:  # CNN models
+        probs = classifier.predict(patches_array, verbose=0).flatten()
+    
+    # Posiziona le predizioni nella mappa
+    for (y, x), prob in zip(positions, probs):
+        prob_map[y:y+patch_size, x:x+patch_size] += prob
+        count_map[y:y+patch_size, x:x+patch_size] += 1
+    
+    # Media delle predizioni sovrapposte
+    prob_map = np.divide(prob_map, count_map, where=count_map > 0)
+    
+    return prob_map
