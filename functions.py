@@ -7,6 +7,8 @@ import os
 import numpy as np
 
 def display_images_by_category(annotations, category_id, num_images=5):
+    """Display a set of images containing annotations for a specific category."""
+
     # Filter annotations for the given category_id
     filtered_annotations = [ann for ann in annotations['annotations'] if ann['category_id'] == category_id]
 
@@ -45,10 +47,12 @@ def display_images_by_category(annotations, category_id, num_images=5):
 
 
 def display_image_with_annotations(ax, image, annotations, display_type='both', colors=None):
-    ax.imshow(image)
-    ax.axis('off')  # Turn off the axes
+    """Display a single image with its annotations on the given axis."""
 
-    # Define a default color map if none is provided
+    ax.imshow(image)
+    ax.axis('off') 
+
+    # Define a default color map
     if colors is None:
         colors = plt.cm.tab10
 
@@ -59,7 +63,6 @@ def display_image_with_annotations(ax, image, annotations, display_type='both', 
         # Display bounding box
         if display_type in ['bbox', 'both']:
             bbox = ann['bbox']
-            # print(bbox)
             rect = patches.CirclePolygon ((bbox[0], bbox[1]), bbox[2], bbox[3], linewidth=1, edgecolor=color, facecolor='none')
             ax.add_patch(rect)
         
@@ -67,11 +70,12 @@ def display_image_with_annotations(ax, image, annotations, display_type='both', 
         if display_type in ['seg', 'both']:
             for seg in ann['segmentation']:
                 poly = [(seg[i], seg[i+1]) for i in range(0, len(seg), 2)]
-                # print(poly)
                 polygon = patches.Polygon(poly, closed=True, edgecolor=color, fill=False)
                 ax.add_patch(polygon)
 
 def display_images_with_coco_annotations(image_paths, annotations, display_type='both', colors=None):
+    """Display multiple images with their COCO annotations."""
+
     fig, axs = plt.subplots(2, 2, figsize=(10, 10))
 
     for ax, img_path in zip(axs.ravel(), image_paths):
@@ -93,18 +97,11 @@ def display_images_with_coco_annotations(image_paths, annotations, display_type=
     
     
 def visualize_annotation_mask(annotations, image_id, show_annotations=False):
-    """
-    Visualize the annotation mask for a given image ID, with an option to display annotations.
+    """Visualize the annotation mask for a given image ID, with an option to display annotations."""
 
-    Parameters:
-        annotations (dict): COCO annotations.
-        image_id (int): ID of the image to visualize.
-        show_annotations (bool): Whether to display annotations on the image.
-    """
     # Find the image metadata
     image_info = next((img for img in annotations['images'] if img['id'] == image_id), None)
 
-    # Load the image
     img_path = os.path.join('Dataset/train', image_info['file_name'])
     image = io.imread(img_path)
 
@@ -133,7 +130,6 @@ def visualize_annotation_mask(annotations, image_id, show_annotations=False):
                         if inside:
                             mask[y, x] = 255
 
-    # Visualize the image and mask
     plt.figure(figsize=(15, 5))
 
 
@@ -162,19 +158,13 @@ def visualize_annotation_mask(annotations, image_id, show_annotations=False):
         plt.title("Original Image")
         plt.axis('off')
 
-    # Adjust layout for better visualization
     plt.tight_layout()
     plt.show()    
     
     
 def create_mask(annotations, image_id, where = "train"):
-    """
-    return the mask of the image
+    """Returns the mask of the image"""
 
-    Parameters:
-        annotations (dict): COCO annotations.
-        image_id (int): ID of the image to visualize.
-    """
     # Find the image metadata
     image_info = next((img for img in annotations['images'] if img['id'] == image_id), None)
 
@@ -214,9 +204,10 @@ def sample_annotation_mask_pixels(mask, num_true=3, num_false=3, random_state=No
     """
     Sample random pixel coordinates from the annotation mask.
 
-    Returns up to ⁠ num_true ⁠ coordinates where the mask is True and
-    ⁠ num_false ⁠ coordinates where the mask is False.
+    Returns up to num_true coordinates where the mask is True and
+    num_false coordinates where the mask is False.
     """
+
     rng = np.random.default_rng(random_state)
     mask_bool = mask.astype(bool)
 
@@ -235,8 +226,12 @@ def sample_annotation_mask_pixels(mask, num_true=3, num_false=3, random_state=No
 
 
 
-# FOR PATCHES
+# PATCHES
+
+
 def pick_random_centers(mask, size=100, ignore=0):
+    """Pick random centers (r,c) within the mask ignoring given borders."""
+
     mask_ignored = mask.copy()
     mask_ignored[:ignore,:]=False
     mask_ignored[-ignore:,:]=False
@@ -249,12 +244,10 @@ def pick_random_centers(mask, size=100, ignore=0):
     for r in range(ignore, h - ignore):
         for c in range(ignore, w - ignore):
             if mask_ignored[r, c]:
-                # Verifica che tutti i pixel nella patch siano True
                 patch = mask_ignored[r-ignore:r+ignore, c-ignore:c+ignore]
                 if np.all(patch):
                     valid_centers.append((r, c))
 
-    # STEP 3: Seleziona random tra i centri validi
     if len(valid_centers) == 0:
         raise ValueError(f"No valid centers found with ignore={ignore}. Try reducing ignore value.")
     
@@ -271,6 +264,7 @@ def pick_random_centers(mask, size=100, ignore=0):
 
 
 def extract_patches(annotations, image_id, where = "train"):
+    """Extract tumor and non-tumor patches from the image."""
 
     image_info = next((img for img in annotations['images'] if img['id'] == image_id), None)
     img_path = os.path.join(f'Dataset/{where}', image_info['file_name'])
@@ -283,7 +277,7 @@ def extract_patches(annotations, image_id, where = "train"):
     patches = []
     labels = []
 
-    # Estrai patches tumorali (garantite al 100% dentro la regione tumor)
+    # Extract tumor patches
     tumor_success = False
     for attempt in range(5):
         try:
@@ -298,7 +292,7 @@ def extract_patches(annotations, image_id, where = "train"):
     if not tumor_success:
         print("Warning: failed to extract tumor patches after 5 attempts")
 
-    # Estrai patches non-tumorali (garantite al 100% fuori dalla regione tumor)
+    # Extract non-tumor patches
     nontumor_success = False
     for attempt in range(5):
         try:
@@ -316,10 +310,10 @@ def extract_patches(annotations, image_id, where = "train"):
     return patches, labels
 
 
-# ===== NUOVE FUNZIONI PER UNET SEGMENTATION =====
+# UNET Functions
 
 def get_annotations_dict(coco_data):
-    """Crea mapping: image_id -> lista di bounding boxes"""
+    """maps image_id to list of bounding boxes"""
     annotations_by_id = {}
     for ann in coco_data['annotations']:
         img_id = ann['image_id']
@@ -330,7 +324,7 @@ def get_annotations_dict(coco_data):
 
 
 def create_mask_from_bbox(image_shape, bboxes):
-    """Crea maschera binaria dai bounding boxes COCO"""
+    """Create a binary mask from bounding boxes."""
     mask = np.zeros(image_shape, dtype=np.float32)
     for bbox in bboxes:
         x, y, w, h = [int(v) for v in bbox]
@@ -341,17 +335,8 @@ def create_mask_from_bbox(image_shape, bboxes):
 
 
 def generate_segmentation_dataset(coco_data, dataset_dir, target_size=64):
-    """
-    Genera dataset di immagini e maschere per UNet
-    - Carica immagine
-    - La ridimensiona a target_size
-    - Riscala le coordinate della segmentazione
-    - Crea la maschera a target_size
-    
-    Returns:
-        X: array (N, target_size, target_size, 3)
-        y: array (N, target_size, target_size, 1)
-    """
+    """Generate segmentation dataset from COCO annotations."""
+
     from PIL import Image
     from skimage import draw
     
@@ -363,33 +348,31 @@ def generate_segmentation_dataset(coco_data, dataset_dir, target_size=64):
         img_path = os.path.join(dataset_dir, img_info['file_name'])
         
         try:
-            # Carica immagine a risoluzione originale
             image = Image.open(img_path).convert('RGB')
             original_w, original_h = image.size
             
-            # Ridimensiona immagine
+            # resize image
             image = image.resize((target_size, target_size), Image.BILINEAR)
             image_array = np.array(image, dtype=np.float32) / 255.0
             
-            # Crea maschera a target_size VUOTA
+            # create empty mask
             mask = np.zeros((target_size, target_size), dtype=np.float32)
             
-            # Rasterizza le segmentazioni ridimensionate
+            # Process annotations for this image
             for ann in coco_data['annotations']:
                 if ann['image_id'] == img_id:
                     for seg in ann.get('segmentation', []):
                         if isinstance(seg, list) and len(seg) >= 6:
-                            # Converti lista di coordinate in array
+                            # convert coordinates to numpy array
                             poly = np.array(seg, dtype=np.float32).reshape(-1, 2)
                             
-                            # Riscala coordinate alla nuova risoluzione
+                            # rescale coordinates
                             poly[:, 0] = poly[:, 0] * (target_size / original_w)
                             poly[:, 1] = poly[:, 1] * (target_size / original_h)
                             
-                            # Rasterizza il poligono sulla maschera
+                            # rasterize polygon
                             try:
                                 poly_int = poly.astype(np.int32)
-                                # draw.polygon(row_coords, col_coords, shape)
                                 rr, cc = draw.polygon(poly_int[:, 1], poly_int[:, 0], 
                                                      shape=(target_size, target_size))
                                 mask[rr, cc] = 1.0
@@ -412,6 +395,7 @@ def generate_segmentation_dataset(coco_data, dataset_dir, target_size=64):
 
 def weighted_binary_crossentropy(tf, y_true, y_pred, tumor_weight, non_tumor_weight):
     """Custom loss that weights tumor pixels more heavily"""
+
     # Clip predictions to avoid log(0)
     y_pred = tf.clip_by_value(y_pred, 1e-7, 1 - 1e-7)
     
@@ -426,6 +410,7 @@ def weighted_binary_crossentropy(tf, y_true, y_pred, tumor_weight, non_tumor_wei
 
 def evaluate_segmentation(model, images, masks, threshold=0.5):
     """Calculate segmentation metrics"""
+    
     predictions = model.predict(images, verbose=0)
     pred_binary = (predictions > threshold).astype(np.uint8)
     
@@ -463,18 +448,8 @@ def evaluate_segmentation(model, images, masks, threshold=0.5):
 
 
 def segment_full_image(classifier, image, patch_size=64, stride=32):
-    """
-    Applica il classificatore di patch su un'immagine intera usando sliding window
-    
-    Args:
-        classifier: Classificatore addestrato (logistic/cnn/fcnn)
-        image: Immagine completa normalizzata [0,1], shape (H, W, 3)
-        patch_size: Dimensione patch (64)
-        stride: Passo della sliding window
-    
-    Returns:
-        Mappa di probabilità (H, W)
-    """
+    """Segment a full image using a patch-based classifier."""
+
     h, w = image.shape[:2]
     prob_map = np.zeros((h, w), dtype=np.float32)
     count_map = np.zeros((h, w), dtype=np.float32)
@@ -482,7 +457,7 @@ def segment_full_image(classifier, image, patch_size=64, stride=32):
     patches = []
     positions = []
     
-    # Estrai tutte le patch con sliding window
+    # extract patches
     for y in range(0, h - patch_size + 1, stride):
         for x in range(0, w - patch_size + 1, stride):
             patch = image[y:y+patch_size, x:x+patch_size]
@@ -496,19 +471,19 @@ def segment_full_image(classifier, image, patch_size=64, stride=32):
     
     patches_array = np.array(patches)
     
-    # Predici in batch per efficienza
+    # Get predictions
     if hasattr(classifier, 'predict_proba'):  # Logistic Regression
         patches_flat = patches_array.reshape(len(patches), -1)
         probs = classifier.predict_proba(patches_flat)[:, 1]
     else:  # CNN models
         probs = classifier.predict(patches_array, verbose=0).flatten()
     
-    # Posiziona le predizioni nella mappa
+    # Aggregate predictions
     for (y, x), prob in zip(positions, probs):
         prob_map[y:y+patch_size, x:x+patch_size] += prob
         count_map[y:y+patch_size, x:x+patch_size] += 1
     
-    # Media delle predizioni sovrapposte
+    #average overlapping areas
     prob_map = np.divide(prob_map, count_map, where=count_map > 0)
     
     return prob_map
