@@ -18,3 +18,8 @@ Provided by Roboflow
 License: CC BY 4.0
 
 
+
+
+fare 4000 patches, 2000 tumori 2000 non tumori. Prendere 10 patches tumori e 10 non tumori, e visualizzarli. In caso che i tumori siano distinguibili, si può allenare
+
+
